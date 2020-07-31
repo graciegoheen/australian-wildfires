@@ -1,0 +1,286 @@
+---
+title: "heatmap"
+author: "Gracie Goheen"
+date: "`r Sys.Date()`"
+output: 
+  github_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+# Libraries
+library(tidyverse)
+library(leaflet)
+library(leaflet.extras)
+library(sf)
+
+# Parameters
+max_temp_raw <- "/Users/graciegoheen/Downloads/dcl/own/2019122920191229.grid"
+aus_fires_url <- "http://www.rfs.nsw.gov.au/feeds/majorIncidents.json"
+countries_data <- "/Users/graciegoheen/Downloads/dcl/ne_110m_admin_0_countries/ne_110m_admin_0_countries.shp"
+nasa_fire_raw <- "https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-01-07/MODIS_C6_Australia_and_New_Zealand_7d.csv"
+
+places_data <- "/Users/graciegoheen/Downloads/dcl/own/ne_110m_populated_places/ne_110m_populated_places.shp"
+
+aus_albers <- "+proj=aea +lat_1=-18 +lat_2=-36 +lat_0=0 +lon_0=134 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs "
+
+#===============================================================================
+
+aus_fires <- st_read(aus_fires_url)
+nasa_fire <- readr::read_csv(nasa_fire_raw)
+
+countries <- read_sf(dsn = countries_data)
+australia <- 
+  countries %>% 
+  filter(NAME == "Australia")
+
+places <- read_sf(dsn = places_data)
+aus_places <- 
+  places %>% 
+  filter(SOV0NAME == "Australia")
+```
+
+Retrieve the .grid file from the [Austrailian Government Bureau of Meterology](http://www.bom.gov.au/jsp/awap/temp/rmse_archive.jsp?map=maxave&period=daily&year=2019&month=12&day=29) for December 29 2019.
+
+```{r}
+max_temp <- 
+  max_temp_raw %>% 
+  read_delim(
+    delim = " ", 
+    col_names = FALSE, 
+    na = "99999.90", 
+    trim_ws = TRUE, 
+    skip = 6, 
+    n_max = 691) %>% 
+  # Is there a better way to get rid of column of NAs?
+  select(-X887) %>% 
+  as.matrix()
+```
+
+
+```{r}
+max_temp_clean <-
+  crossing(i = 1:691, j = 1:886) %>% 
+  mutate(
+    max_temp = map2_dbl(i, j, ~ max_temp[[.x,.y]]),
+    lat = -44.500 + 0.050 * 691 - 0.050 * i,
+    long = 112.000 + 0.050 * j
+  ) %>%
+  select(long, lat, max_temp)
+```
+
+
+```{r}
+australia %>% 
+  ggplot() +
+  geom_sf() +
+  geom_raster(data = max_temp_clean, aes(x = long, y = lat, fill = max_temp)) +
+  scale_fill_gradientn(colors = heat.colors(9, rev = TRUE)) +
+  theme_void() 
+```
+
+```{r}
+ggplot() +
+  geom_raster(data = max_temp_clean, aes(x = long, y = lat, fill = max_temp)) +
+  geom_sf(data = australia, fill = NA)
+
+# Bin it, and discrete colors
+```
+
+
+```{r}
+max_temp_clean %>% 
+  ggplot(aes(long, lat, max_temp)) +
+  geom_raster(aes(fill = max_temp)) +
+  scale_fill_gradientn(colors = heat.colors(9, rev = TRUE)) +
+  theme_void()
+
+# How do I use st_intersection to get coordinates just inside austrailia.
+```
+
+```{r}
+max_temp_clean_sf <-
+  max_temp_clean %>% 
+  st_as_sf(coords = c("long", "lat"), crs = 4326) 
+```
+
+```{r}
+max_temp_clean_sf %>% 
+  ggplot(aes(color = max_temp)) +
+  geom_sf()
+```
+
+
+```{r}
+max_temp_aus_only <-
+  st_intersection(
+    x = max_temp_clean_sf,
+    y = australia
+  )
+```
+
+```{r}
+max_temp_aus_only %>% 
+  ggplot(aes(color = max_temp)) +
+  geom_sf()
+```
+
+
+```{r}
+max_temp_aus_only_coord <-
+  max_temp_aus_only %>% 
+  transmute(
+    max_temp,
+    long = st_coordinates(geometry) %>% as_tibble() %>% pull(X),
+    lat = st_coordinates(geometry) %>% as_tibble() %>% pull(Y)
+  )
+```
+
+
+```{r}
+max_temp_aus_only_coord %>% 
+  ggplot(aes(long, lat, z = max_temp)) +
+  geom_contour() +
+  coord_fixed()
+```
+
+```{r}
+max_temp_aus_only_coord %>% 
+  ggplot(aes(long, lat, fill = max_temp)) +
+  geom_density_2d() + 
+  coord_fixed()
+```
+
+
+```{r}
+max_temp_aus_only_coord %>% 
+  ggplot(aes(long, lat, z = max_temp)) +
+  stat_contour(aes(fill = ..level..), geom = "polygon") +
+  coord_fixed()
+  
+```
+
+
+```{r}
+max_temp_aus_only_coord %>% 
+  ggplot(aes(long, lat, max_temp)) +
+  geom_raster(aes(fill = max_temp)) +
+  scale_fill_gradientn(colors = heat.colors(9, rev = TRUE)) +
+  coord_fixed() + 
+  theme_void()
+```
+
+```{r}
+max_temp_aus_only_coord %>% 
+  ggplot(aes(max_temp)) +
+  geom_histogram()
+```
+
+
+```{r}
+max_temp_aus_only_coord %>% 
+  mutate(max_temp = pmin(45, 3 * round(max_temp / 3))) %>% 
+  ggplot() +
+  geom_tile(aes(x = long, y = lat, fill = max_temp)) +
+  geom_sf(data = australia, size = 0.1, fill = NA) +
+  scale_fill_gradientn(colors = heat.colors(9, rev = TRUE)) +
+  theme_void()
+```
+
+```{r}
+max_temp_aus_only_coord %>% 
+  mutate(max_temp = pmin(45, 3 * round(max_temp / 3))) %>% 
+  count(max_temp)
+```
+
+```{r}
+colors <- 
+  c(
+    "18" = "#f6d387",
+    "21" = "#f3bc67",
+    "24" = "#eda455",
+    "27" = "#ea955a",
+    "30" = "#df8561",
+    "33" = "#da8368",
+    "36" = "#d16768",
+    "39" = "#bf191f",
+    "42" = "#97040b",
+    "45" = "#6f0206"
+  )
+
+max_temp_aus_only_coord %>% 
+    # st_transform(crs = aus_albers) %>% 
+  mutate(max_temp = pmin(45, 3 * round(max_temp / 3))) %>%
+  ggplot() +
+  geom_raster(aes(x = long, y = lat, fill = factor(max_temp))) +
+  geom_sf(data = australia, size = 0.1, fill = NA) +
+  geom_sf(data = aus_places, color = "white") +
+  geom_sf_label(
+    aes(label = NAME),
+    #fix labels
+    size = 2,
+    data = aus_places
+  ) +
+  scale_fill_manual(
+    values = colors,
+    breaks = seq(18, 45, 3)
+  ) +
+  guides(
+    fill = 
+      guide_legend(
+        title.position = "top", 
+        title.hjust = 0.5, 
+        label.position = "bottom", 
+        nrow = 1)
+  ) +
+  theme_void() +
+  #fix legend
+  theme(
+    legend.position = "bottom",
+    legend.direction = "horizontal"
+  ) +
+  labs(
+    title = "Mean maximum temperature",
+    subtitle = "Dec 29 2019",
+    fill = "Mean maximum temperature (°C)", 
+    caption = "Source: BOM Austrailia, Natural Earth"
+  )
+```
+
+```{r}
+summary(max_temp_aus_only_coord$max_temp)
+```
+
+
+```{r}
+# st_intersection(max_temp_clean_sf, australia)
+```
+
+```{r}
+# australia %>% 
+#   ggplot() +
+#   geom_sf() +
+#   geom_raster(data = max_temp_clean_, aes(x = long, y = lat, fill = max_temp)) +
+#   scale_fill_gradientn(colors = heat.colors(9, rev = TRUE)) +
+#   theme_void() 
+```
+
+
+```{r}
+st_crs(australia)
+```
+
+
+```{r}
+# Points represent any detection of fire, not actual area burned. 
+
+# nasa_fire %>% 
+#   leaflet() %>% 
+#   addProviderTiles(providers$CartoDB.Positron) %>% 
+#   addCircles(lng = ~longitude, lat = ~latitude, radius = ~brightness, color = "red") 
+```
+

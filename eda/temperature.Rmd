@@ -1,0 +1,208 @@
+---
+title: "temperature"
+author: "Gracie Goheen"
+date: "`r Sys.Date()`"
+output: 
+  github_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+# Libraries
+library(tidyverse)
+library(lubridate)
+
+# Parameters
+temperature_data <- here::here("c01-own/data/temperature.rds")
+temperature <- read_rds(temperature_data)
+#===============================================================================
+
+```
+
+## Temperature by City 
+
+```{r}
+summary(temperature)
+```
+
+```{r}
+sum(is.na(temperature))
+```
+
+```{r}
+temperature %>% 
+  count(city_name)
+```
+
+```{r}
+temperature %>% 
+  mutate(date = ymd(date)) %>% 
+  filter(year(date) == 2019)
+```
+
+```{r}
+temperature %>% 
+  top_n(n = 1, wt = temperature)
+```
+
+```{r}
+temperature %>% 
+  mutate(
+    date = ymd(date),
+    year = year(date)
+  ) %>% 
+  count(year) %>% 
+  arrange(desc(year))
+```
+
+
+```{r}
+temperature %>% 
+  filter(city_name == "PERTH") %>% 
+  ggplot(aes(date, temperature, color = temp_type)) +
+  geom_line()
+```
+
+```{r}
+temperature %>% 
+  mutate(date = ymd(date)) %>% 
+  filter(
+    year(date) == 2019, 
+  ) %>% 
+  ggplot(aes(date, temperature, color = temp_type)) +
+  geom_line() +
+  facet_wrap(vars(city_name))
+
+```
+
+
+```{r}
+temperature %>% 
+  group_by(city_name, temp_type) %>% 
+  summarise(avg_temp = median(temperature, na.rm = TRUE)) %>% 
+  ggplot(aes(fct_reorder(city_name, avg_temp), avg_temp, color = temp_type)) +
+  geom_point()
+```
+
+```{r}
+temperature %>% 
+  mutate(
+    city_name = as_factor(city_name)
+  ) %>% 
+  ggplot(aes(city_name, temperature, color = temp_type)) +
+  geom_boxplot(position = "dodge")
+```
+
+
+```{r}
+temperature %>% 
+  mutate(
+    year = year(date)
+  ) %>% 
+  group_by(year, temp_type) %>% 
+  summarise(avg_temp = median(temperature, na.rm = TRUE)) %>%
+  ggplot(aes(year, avg_temp, color = temp_type)) +
+  geom_line()
+```
+
+```{r}
+temperature %>% 
+  mutate(
+    year = year(date)
+  ) %>% 
+  filter(year %in% c(2016:2019)) %>% 
+  group_by(year, temp_type) %>% 
+  summarise(avg_temp = median(temperature, na.rm = TRUE)) %>%
+  ggplot(aes(year, avg_temp, color = temp_type)) +
+  geom_line()
+```
+
+
+```{r}
+# Attempt to recreate the New York Times "2019 was Australia’s hottest year" graph.
+
+temperature %>% 
+  drop_na() %>% 
+  mutate(year = year(date)) %>% 
+  group_by(year) %>% 
+  summarise(temp_year = mean(temperature)) %>% 
+  mutate(
+    avg_temp = mean(temp_year),
+    temp_dif = temp_year - avg_temp
+  ) %>% 
+  ggplot(aes(year, temp_dif)) +
+  geom_col()
+```
+
+```{r}
+# Attempt to recreate the New York Times "2019 was Australia’s hottest year" graph.
+
+temperature %>% 
+  drop_na() %>% 
+  filter(temp_type == "max") %>%
+  mutate(year = year(date)) %>% 
+  group_by(year) %>% 
+  # median or mean? max or min?
+  summarise(temp_year = mean(temperature)) %>% 
+  mutate(
+    avg_temp = mean(temp_year),
+    temp_dif = temp_year - avg_temp
+  ) %>% 
+  ggplot(aes(year, temp_dif)) +
+  geom_col()
+```
+
+```{r}
+# Attempt to recreate the New York Times "2019 was Australia’s hottest year" graph.
+
+# The 1961–1990 average temperature
+avg_temp_range <- 
+  temperature %>% 
+  drop_na() %>% 
+  mutate(year = year(date)) %>% 
+  filter(year %in% c(1961:1990)) %>% 
+  summarize(mean(temperature))
+
+temp_2019 <-
+  temperature %>% 
+  drop_na() %>% 
+  mutate(year = year(date)) %>% 
+  group_by(year) %>% 
+  summarise(temp_year = mean(temperature)) %>% 
+  mutate(
+    temp_dif =  temp_year - as.double(avg_temp_range)
+  ) %>% 
+  filter(year == 2019)
+
+temperature %>% 
+  drop_na() %>% 
+  mutate(year = year(date)) %>% 
+  group_by(year) %>% 
+  summarise(temp_year = mean(temperature)) %>% 
+  mutate(
+    temp_dif =  temp_year - as.double(avg_temp_range)
+  ) %>% 
+  ggplot(aes(year, temp_dif)) +
+  geom_col(fill = "grey") +
+  geom_col(data = temp_2019, aes(year, temp_dif, fill = "red")) +
+  theme(
+    axis.title.x = element_blank(),
+    axis.ticks = element_blank(),
+    legend.position = "none",
+    panel.background = element_rect(fill = "transparent"),
+    panel.grid = element_line(color = "transparent"),
+    panel.grid.major.y = element_line(color = "White"),
+    panel.ontop = TRUE
+  ) +
+  labs(
+    title = "2019 was Australia’s hottest year.",
+    y = "Annual temperature above or below the 1961–1990 average"
+  )
+```
+
+
+Something seems to be wrong with my data, because my graph looks very different. I also need to figure out how to do the y scale and caption / arrows. 

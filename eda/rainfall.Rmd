@@ -1,0 +1,37 @@
+---
+title: "rainfall"
+author: "Gracie Goheen"
+date: "`r Sys.Date()`"
+output: 
+  github_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+# Libraries
+library(tidyverse)
+
+# Parameters
+rainfall_data <- here::here("c01-own/data/rainfall.rds")
+
+#===============================================================================
+
+```
+
+## Read in Data
+
+```{r}
+rainfall <- read_rds(rainfall_data)
+glimpse(rainfall)
+```
+
+## Section 1
+
+### Subsection
+
+## Section 2
+

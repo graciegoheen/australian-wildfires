@@ -1,0 +1,72 @@
+---
+title: "fire_heat"
+author: "Gracie Goheen"
+date: "`r Sys.Date()`"
+output: 
+  github_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+# Libraries
+library(tidyverse)
+library(sf)
+library(mapview)
+library(ozmaps)
+
+# Parameters
+url <- "http://www.rfs.nsw.gov.au/feeds/majorIncidents.json"
+aus_fires <- st_read(url)
+nasa_fire <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-01-07/MODIS_C6_Australia_and_New_Zealand_7d.csv')
+sf_oz <- ozmap_data("country")
+
+
+#===============================================================================
+
+```
+
+## Section 1
+```{r}
+ aus_fires %>% 
+  st_buffer(dist = 0) %>% 
+  st_union(by_feature = TRUE) %>% 
+  mapview()
+```
+
+
+### Subsection
+```{r}
+aus_fires %>% 
+  ggplot() +
+  geom_sf() 
+```
+
+
+```{r}
+fire_time_map <-
+  sf_oz %>% 
+  ggplot() +
+  geom_sf() +
+  geom_point(data = nasa_fire, aes(x = longitude, y = latitude), color = "red", alpha = .2) +
+  coord_sf(datum = NA) + 
+  transition_time(acq_date) +
+  theme_void()
+
+gganimate::animate(fire_time_map)
+```
+
+```{r}
+nasa_fire %>% 
+  ggplot() +   
+  borders("world", colour = NA, fill = "wheat1") +
+  geom_point(aes(x = longitude, y = latitude), color = "red", alpha = .2) +
+  scale_x_continuous(name="Longitude", limits=c(110, 160)) +
+  scale_y_continuous(name="Latitude", limits=c(-45, -10)) +
+  theme_void()
+```
+
+

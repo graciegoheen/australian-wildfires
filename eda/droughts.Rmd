@@ -1,0 +1,86 @@
+---
+title: "droughts"
+author: "Gracie Goheen"
+date: "`r Sys.Date()`"
+output: 
+  github_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+# Libraries
+library(tidyverse)
+library(sf)
+
+# Parameters
+  # Rainfall .grid file for December 2019
+rainfall_dec19_raw <- "/Users/graciegoheen/Downloads/dcl/own/rainfall/2019120120191231.grid"
+  # Geometry data for countries
+countries_data <- "/Users/graciegoheen/Downloads/dcl/ne_110m_admin_0_countries/ne_110m_admin_0_countries.shp"
+#===============================================================================
+
+
+countries <- read_sf(dsn = countries_data)
+australia <- 
+  countries %>% 
+  filter(NAME == "Australia")
+
+```
+
+## Clean the data
+
+```{r}
+rainfall_dec19_matrix <- 
+  rainfall_dec19_raw %>% 
+  read_delim(
+    delim = " ", 
+    col_names = FALSE, 
+    na = "99999.90", 
+    trim_ws = TRUE, 
+    skip = 6, 
+    n_max = 691) %>% 
+  select(-X887) %>% 
+  as.matrix()
+```
+
+```{r}
+rainfall_dec19 <-
+  crossing(i = 1:691, j = 1:886) %>% 
+  mutate(
+    rainfall = map2_dbl(i, j, ~ rainfall_dec19_matrix[.x,.y]),
+    lat = -44.500 + 0.050 * 691 - 0.050 * i,
+    long = 112.000 + 0.050 * j
+  ) %>%
+  select(long, lat, rainfall)
+```
+
+```{r}
+# rainfall_dec19_aus <-
+#   st_intersection(
+#     x = rainfall_dec19 %>% st_as_sf(coords = c("long", "lat"), crs = 4326) ,
+#     y = australia
+#   )
+```
+
+
+## Plot
+
+```{r}
+# rainfall_dec19_aus %>% 
+#   transmute(
+#     rainfall,
+#     long = st_coordinates(geometry) %>% as_tibble() %>% pull(X),
+#     lat = st_coordinates(geometry) %>% as_tibble() %>% pull(Y)
+#   ) %>% 
+#   ggplot() +
+#   geom_tile(aes(x = long, y = lat, fill = rainfall)) +
+#   geom_sf(data = australia, size = 0.1, fill = NA) +
+#   scale_fill_gradientn(colors = heat.colors(9, rev = TRUE)) +
+#   theme_void()
+```
+
+
