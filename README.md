@@ -1,4 +1,4 @@
-# Own challenge
+# Austrailian Wildfires
 
 Folders:
 
@@ -8,4 +8,4 @@ Folders:
 * [eda](eda): Exploratory data analysis studies
 * [reports](reports): Project proposals, progress reports, and final report
 * [scripts](scripts): Scripts to process data
-* [team-challenge](team-challenge): Challenge for teammates
+
